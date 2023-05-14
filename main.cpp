@@ -53,6 +53,8 @@ DigitalOut StepDriver(PB_11);
 int tempo = 2;
 int AutomatizacaoMotor = 0;
 
+int SinalEMERGENCIA = 0;
+
 bool Referenciamento = 0;
 int CounterX = 0;
 int CounterY = 0;
@@ -84,15 +86,16 @@ int listaPosZ[10];
 int listaPosY[10];
 int lista_ml[10];
 
-int SinaljogManual = 1;
-int SinaljogAutomatico = 1;
+int SinalJOGManual = 1;
+int SinalJOGAutomatico = 1;
 int SinalReferenciamentoX = 0;
 int SinalReferenciamentoY = 0;
 int SinalReferenciamentoZ = 0;
 
+
+
 int eixo_x_finalizado = 0;
 int eixo_y_finalizado = 0;
-int flag_emergencia = 0;
 
 int execucao = 0;
 int NSoltar = 1;
@@ -155,12 +158,16 @@ void lcd_show(int estado) {
     }
 }
 
-// Referenciamento de cada um dos eixos, começando pelo Z, uma vez que foi a entrega da APS 5
+// Referenciamento de cada um dos eixos, começando pelo Z, uma vez que foi a entrega da APS 5 e portanto o primeiro a ser feito
+// Função ReferenciamentoZ: Aciona um motorZ enquanto a variável MotorAcionado for igual a 1.
+// Se o sinal de referenciamento Z for 0(não referenciado), altera o estado do driver de passo, aguarda um tempo especificado(2), desativa o motor Z e move o motor no sentido anti-horário.
+// Caso contrário, inicia um laço infinito(while) que muda o estado do driver de passo, aguarda um tempo especificado(2), move o motor no sentido horário e incrementa um contador.
+// Se o contador ultrapassar 750, ativa o motor Z, define MotorAcionado como 1, define SinalReferenciamentoZ como 1 e encerra o laço.
 void ReferenciamentoZ(int MotorAcionado){
     EnableMotorZ = 1;
     while(MotorAcionado == 1){
         if(SinalReferenciamentoZ == 0){
-            StepDriver = !StepDriver;
+            StepDriver =! StepDriver;
             wait_ms(tempo);
             EnableMotorZ = 0;
             MotorZ.SentidoAnti();
@@ -168,13 +175,13 @@ void ReferenciamentoZ(int MotorAcionado){
             Counter = 0;
             
             while(1){
-                StepDriver = !StepDriver;
+                StepDriver =! StepDriver;
                 wait_ms(tempo);
                 MotorZ.SentidoHorario();
                 Counter ++;
                 if(Counter > 750){
                     EnableMotorZ = 1;
-                    MotorAcionado = 3;
+                    MotorAcionado = 1;
                     SinalReferenciamentoZ = 1;
                     break;
                 }
@@ -183,6 +190,10 @@ void ReferenciamentoZ(int MotorAcionado){
     }
 }
 
+// Função para validar o início do referenciamento em Z
+// Verifica se passaram 200ms desde a última mudança de estado. 
+// Se sim, e se o sinal de referenciamento em x for 0, incrementa ao sinal.
+// Em seguida, imprime o estado atual do sinal e reinicia o contador de tempo.
 void CheckInicioZ(){
     if(debounce.read_ms() > 200){
         if(SinalReferenciamentoZ == 0){
@@ -192,7 +203,9 @@ void CheckInicioZ(){
     }
     debounce.reset();
 }
-    
+
+// Função para validar o fim do referenciamento em Z, mas verifica se o sinal de referenciamento em x é 1.
+// Se sim, incrementa ao sinal. Em seguida, imprime o estado atual do sinal e reinicia o contador de tempo.
 void CheckFimZ(){
     if(debounce.read_ms() > 200){
         if(SinalReferenciamentoZ == 1){
@@ -200,16 +213,19 @@ void CheckFimZ(){
         }
         printf("Sinal fim do x : %d \r", SinalReferenciamentoZ);
     }
-    
+
     debounce.reset();
 }
 
-
+// Função ReferenciamentoX: Aciona um motorX enquanto a variável MotorAcionado for igual a 1.
+// Se o sinal de referenciamento X for 0(não referenciado), altera o estado do driver de passo, aguarda um tempo especificado(2), desativa o motor X e move o motor no sentido horário.
+// Caso contrário, inicia um laço infinito(while) que muda o estado do driver de passo, aguarda um tempo especificado(2), move o motor no sentido anti-horário e incrementa um contador.
+// Se o contador ultrapassar 750, ativa o motor X, define MotorAcionado como 2, define SinalReferenciamentoX como 1 e encerra o laço.
 void ReferenciamentoX(int MotorAcionado){
     while(MotorAcionado == 1){
         Counter ++;
         if(SinalReferenciamentoX == 0){
-            StepDriver = !StepDriver;
+            StepDriver =! StepDriver;
             wait_ms(tempo);
             EnableMotorX = 0;
             MotorX.SentidoHorario();
@@ -218,7 +234,7 @@ void ReferenciamentoX(int MotorAcionado){
             Counter = 0;
             
             while(1){
-                StepDriver = !StepDriver;
+                StepDriver =! StepDriver;
                 wait_ms(tempo);
                 MotorX.SentidoAnti();
                 Counter ++;
@@ -233,6 +249,10 @@ void ReferenciamentoX(int MotorAcionado){
     }            
 }
 
+// Função para validar o início do referenciamento em X
+// Verifica se passaram 200ms desde a última mudança de estado. 
+// Se sim, e se o sinal de referenciamento em x for 0, incrementa ao sinal.
+// Em seguida, imprime o estado atual do sinal e reinicia o contador de tempo.
 void CheckInicioX(){
     if(debounce.read_ms() > 200){
         if(SinalReferenciamentoX == 0){
@@ -242,7 +262,9 @@ void CheckInicioX(){
     }
     debounce.reset();
 }
-    
+
+// Função para validar o fim do referenciamento em X, mas verifica se o sinal de referenciamento em x é 1.
+// Se sim, incrementa ao sinal. Em seguida, imprime o estado atual do sinal e reinicia o contador de tempo.
 void CheckFimX(){
     if(debounce.read_ms() > 200){
         if(SinalReferenciamentoX == 1){
@@ -254,11 +276,15 @@ void CheckFimX(){
     debounce.reset();
 }
 
+// Função ReferenciamentoY: Aciona um motorY enquanto a variável MotorAcionado for igual a 1.
+// Se o sinal de referenciamento Y for 0(não referenciado), altera o estado do driver de passo, aguarda um tempo especificado(2), desativa o motor Y e move o motor no sentido anti-horário.
+// Caso contrário, inicia um laço infinito(while) que muda o estado do driver de passo, aguarda um tempo especificado(2), move o motor no sentido horário e incrementa um contador.
+// Se o contador ultrapassar 750, ativa o motor Y, define MotorAcionado como 3, define SinalReferenciamentoY como 1 e encerra o laço.
 void ReferenciamentoY(int MotorAcionado){
     while(MotorAcionado == 1){        
         Counter ++;
         if(SinalReferenciamentoY == 0){
-            StepDriver = !StepDriver;
+            StepDriver =! StepDriver;
             wait_ms(tempo);
             EnableMotorY = 0;
             MotorY.SentidoAnti();
@@ -267,7 +293,7 @@ void ReferenciamentoY(int MotorAcionado){
             Counter = 0;
             
             while(1){
-                StepDriver = !StepDriver;
+                StepDriver =! StepDriver;
                 wait_ms(tempo);
                 MotorY.SentidoHorario();
                 Counter ++;
@@ -283,7 +309,10 @@ void ReferenciamentoY(int MotorAcionado){
                 
     } 
 }
-
+// Função para validar o início do referenciamento em Y
+// Verifica se passaram 200ms desde a última mudança de estado. 
+// Se sim, e se o sinal de referenciamento em x for 0, incrementa ao sinal.
+// Em seguida, imprime o estado atual do sinal e reinicia o contador de tempo.
 void CheckInicioY(){
     if(debounce.read_ms() > 200){
         if(SinalReferenciamentoY == 0){
@@ -293,7 +322,10 @@ void CheckInicioY(){
     }
     debounce.reset();
 }
-    
+
+// Função para validar o fim do referenciamento em Y, mas verifica se o sinal de referenciamento em x é 1.
+// Se sim, incrementa ao sinal. Em seguida, imprime o estado atual do sinal e reinicia o contador de tempo.
+
 void CheckFimY(){
     if(debounce.read_ms() > 200){
         if(SinalReferenciamentoY == 1){
