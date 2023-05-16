@@ -3,13 +3,17 @@
 
 #include "mbed.h"
 
+enum Direcao {
+    HORARIO,
+    ANTIHORARIO
+};
+
 class Motor {
     public:
-        Motor(PinName outputPin);
-        void SentidoHorario(void);
-        void SentidoAnti(void);
+        Motor(PinName pinoSaida);
+        void definirDirecao(Direcao direcao);
     private:
-        DigitalOut controlPin;
+        DigitalOut pinoControle;
 };
 
 #endif

@@ -101,58 +101,56 @@ int execucao = 0;
 int NSoltar = 1;
 int conta_posicoes = 0;
 int mililitros = 0;
-int quantidade_mls = 0;
-int etapa_pos_setup = 100;
-bool autoriza_etapa = 0;
+
 
 Timer debounce;
 
-void lcd_show(int estado) {
+void lcd_show(int state) {
     lcd.cls();
 
-    if (estado == 0) {
+    if (state == 0) {
         lcd.printf("Olá! \n");
         lcd.printf("Pressione 'ENTER' \n");
         lcd.printf("para iniciar o \n");
         lcd.printf("referenciamento");
         execucao = 1;
-    } else if (estado == 1) {
+    } else if (state == 1) {
         lcd.printf("Referenciamento \n");
         lcd.printf("Em \n");
         lcd.printf("Execucao... \n");
-    } else if (estado == 2) {
+    } else if (state == 2) {
         lcd.printf("Referenciamento \n");
         lcd.printf("concluido \n");
         lcd.printf("Deseja selecionar a posicao de pega ? \n");
-    } else if (estado == 3) {
+    } else if (state == 3) {
         lcd.printf("Botao de emergencia!! beep  \n");
-    } else if (estado == 4) {
-        lcd.printf("X de coleta:%4d\n", PosicaoX);
-        lcd.printf("Y de coleta:%4d\n", PosicaoY);
-        lcd.printf("Z de coleta:%4d\n", PosicaoZ);
+    } else if (state == 4) {
+        lcd.printf("X de pegar:%4d\n", PosicaoX);
+        lcd.printf("Y de pegar:%4d\n", PosicaoY);
+        lcd.printf("Z de pegar:%4d\n", PosicaoZ);
         lcd.printf("Pressione 'Continua'");
-    } else if (estado == 5) {
+    } else if (state == 5) {
         lcd.printf("Qtd de pontos\n");
         lcd.printf("De despejo: %3d\n", NSoltar);
         lcd.printf("Pressione 'Confirma' \n");
         lcd.printf("Para confirmar");
-    } else if (estado == 6) {
+    } else if (state == 6) {
         lcd.printf("Aperte 'Confirma' para \n");
         lcd.printf("iniciar a selecao\n");
         lcd.printf("das posicoes de \n");
         lcd.printf("SOLTA \n");
-    } else if (estado == 7) {
+    } else if (state == 7) {
         lcd.printf("Aperte 'Confirma' para \n");
         lcd.printf("iniciar o ciclo\n");
         lcd.printf("automatico \n");    
-    } else if (estado == 8) {
+    } else if (state == 8) {
         lcd.printf("Voltando para \n");
         lcd.printf("Tela de Inicio \n");
 
-    } else if (estado == 9) {
+    } else if (state == 9) {
         lcd.printf("Iniciando ciclo\n");
         lcd.printf("automatico \n");
-    } else if (estado == 10) {
+    } else if (state == 10) {
         lcd.printf("Qts ml para a\n");
         lcd.printf("posicao: %3d\n", mililitros);
     }
@@ -170,14 +168,14 @@ void ReferenciamentoZ(int MotorAcionado){
             StepDriver =! StepDriver;
             wait_ms(tempo);
             EnableMotorZ = 0;
-            MotorZ.SentidoAnti();
+            MotorZ.definirDirecao(ANTIHORARIO);
         } else {
             Counter = 0;
             
             while(1){
                 StepDriver =! StepDriver;
                 wait_ms(tempo);
-                MotorZ.SentidoHorario();
+                MotorZ.definirDirecao(HORARIO);
                 Counter ++;
                 if(Counter > 750){
                     EnableMotorZ = 1;
@@ -228,7 +226,7 @@ void ReferenciamentoX(int MotorAcionado){
             StepDriver =! StepDriver;
             wait_ms(tempo);
             EnableMotorX = 0;
-            MotorX.SentidoHorario();
+            MotorX.definirDirecao(HORARIO);
             
         } else{
             Counter = 0;
@@ -236,12 +234,12 @@ void ReferenciamentoX(int MotorAcionado){
             while(1){
                 StepDriver =! StepDriver;
                 wait_ms(tempo);
-                MotorX.SentidoAnti();
+                MotorX.definirDirecao(ANTIHORARIO);
                 Counter ++;
                 if(Counter > 750){
+                    SinalReferenciamentoX = 2;
                     EnableMotorX = 1;
                     MotorAcionado = 2;
-                    SinalReferenciamentoX = 2;
                     break;
                 }   
             }
@@ -287,7 +285,7 @@ void ReferenciamentoY(int MotorAcionado){
             StepDriver =! StepDriver;
             wait_ms(tempo);
             EnableMotorY = 0;
-            MotorY.SentidoAnti();
+            MotorY.definirDirecao(ANTIHORARIO);
             
         } else{
             Counter = 0;
@@ -295,7 +293,7 @@ void ReferenciamentoY(int MotorAcionado){
             while(1){
                 StepDriver =! StepDriver;
                 wait_ms(tempo);
-                MotorY.SentidoHorario();
+                MotorY.definirDirecao(HORARIO);
                 Counter ++;
                 if(Counter > 400){
                     EnableMotorY = 1;
@@ -338,3 +336,80 @@ void CheckFimY(){
 }
 
 
+
+// A função atualizarEstadoSinalJOGManual é responsável por atualizar o estado do SinalJOGManual, que é usado para indicar o eixo atual.
+// Ela verifica se mais de 150 milissegundos se passaram desde a última vez que o estado foi alterado (usando o objeto debounce).
+// Se esse for o caso, o estado é atualizado para o novo valor fornecido e o tempo é resetado (usando debounce.reset()).
+// A nova situação do SinalJOGManual é então impressa na saída padrão.
+
+void atualizarEstadoSinalJOGManual(int novoEstado) {
+    if(debounce.read_ms() > 150){
+        SinalJOGManual = novoEstado;
+        printf("Estado SinalJOGManual: %d \n \r", SinalJOGManual);
+        debounce.reset();
+    }
+}
+// A função alterarParaEixoX é responsável por mudar o estado do SinalJOGManual para 1, que representa o eixo X.
+// Ela chama a função atualizarEstadoSinalJOGManual com o novo estado como argumento.
+void alterarParaEixoX() {
+    atualizarEstadoSinalJOGManual(1);
+}
+// A função alterarParaEixoY é responsável por mudar o estado do SinalJOGManual para 2, que representa o eixo Y.
+// Ela chama a função atualizarEstadoSinalJOGManual com o novo estado como argumento.
+void alterarParaEixoY() {
+    atualizarEstadoSinalJOGManual(2);
+}
+// A função alterarParaEixoZ é responsável por mudar o estado do SinalJOGManual para 3, que representa o eixo Z.
+// Ela chama a função atualizarEstadoSinalJOGManual com o novo estado como argumento.
+void alterarParaEixoZ() {
+    atualizarEstadoSinalJOGManual(3);
+}
+
+
+// A função aguardarAjusteMililitros é responsável por ajustar a quantidade de mililitros com base na leitura do joystick.
+// Ela recebe um ponteiro para a variável mililitros, o valor atual da leitura do joystick e um valor de incremento.
+// Enquanto o valor da leitura do joystick estiver abaixo de 300 ou acima de 600, a função continuará em loop, ajustando a quantidade de mililitros.
+// O ajuste é feito adicionando o valor do incremento à variável mililitros a cada 0.3 segundos.
+// Se a quantidade de mililitros for menor do que zero, ela é ajustada para zero.
+
+void aguardarAjusteMililitros(int* mililitros, double valorLeituraJoyStick, int incremento) {
+    while(valorLeituraJoyStick < 300 || valorLeituraJoyStick > 600){
+        wait(0.3);
+        valorLeituraJoyStick = JoyStick.read() * 1000;
+        *mililitros += incremento;
+        printf("Mililitros: %d \n \r", *mililitros);
+        if(*mililitros < 0) *mililitros = 0;
+    }
+}
+
+
+// A função calcularMililitrosDespejo é a principal função para calcular a quantidade de mililitros a serem despejados.
+// Ela inicia limpando o display do LCD e exibindo o valor inicial de mililitros (1).
+// Em seguida, entra em um loop infinito, onde lê o valor do joystick e exibe a quantidade atual de mililitros no LCD.
+// Se a leitura do joystick for menor que 300, a função aguardarAjusteMililitros é chamada para diminuir a quantidade de mililitros.
+// Se a leitura do joystick for maior que 600, a função aguardarAjusteMililitros é chamada para aumentar a quantidade de mililitros.
+// Quando a variável prosseguir for verdadeira, a função retorna a quantidade atual de mililitros e sai do loop.
+
+int calcularMililitrosDespejo() {
+    lcd.cls();
+    lcd_show(10);
+    int mililitros = 1;
+    bool prosseguir = false;
+    double valorLeituraJoyStick;
+
+    while(true){
+        valorLeituraJoyStick = JoyStick.read() * 1000;
+        lcd.locate(0, 1);
+        lcd.printf("para a posicao: %3d\n", mililitros);
+
+        if(valorLeituraJoyStick < 300) {
+            aguardarAjusteMililitros(&mililitros, valorLeituraJoyStick, -1);
+        } else if(valorLeituraJoyStick > 600) {
+            aguardarAjusteMililitros(&mililitros, valorLeituraJoyStick, 1);
+        }
+
+        if(prosseguir) {
+            return mililitros;
+        }
+    }   
+}
