@@ -96,8 +96,8 @@ int SinalReferenciamentoZ = 0;
 
 
 
-int eixo_x_finalizado = 0;
-int eixo_y_finalizado = 0;
+int SinalFinalizadoX = 0;
+int SinalFinalizadoY = 0;
 
 int exec = 0;
 int NSoltar = 1;
@@ -661,10 +661,10 @@ void JOGManual(int index){
             }
 
             PosicaoX = CounterX;
+            EnableMotorX = 1;
+            EnableMotorY = 1;
         }
 
-        EnableMotorX = 1;
-        EnableMotorY = 1;
         }
 
         //EIXO Y
@@ -691,10 +691,10 @@ void JOGManual(int index){
             }
 
             PosicaoY = CounterY;
+            EnableMotorX = 1;
+            EnableMotorY = 1;  
         }
 
-        EnableMotorX = 1;
-        EnableMotorY = 1;
     }
           //EIXO Z
         CounterZ = PosicaoZ;
@@ -720,10 +720,107 @@ void JOGManual(int index){
             }
 
             PosicaoZ = CounterZ;
+            EnableMotorX = 1;
+            EnableMotorY = 1;
+            EnableMotorZ = 1;
+        }    
+
+
+       while(SinalJOGManual == 4) {
+            listaPosX[ContaIndex] = PosicaoX;
+            listaPosY[ContaIndex] = PosicaoY;
+            listaPosZ[ContaIndex] = PosicaoZ;
+            UltimoX = PosicaoX;
+            UltimoZ = PosicaoY;
+            UltimoX = PosicaoZ;
+
+            printf("Posicao X: %d \n \r", listaPosX[ContaIndex]);
+            printf("Posicao Y: %d \n \r", listaPosY[ContaIndex]);
+            printf("Posicao Z: %d \n \r", listaPosZ[ContaIndex]);
+            printf("Valor counter %d \n \r", ContaIndex);
+            printf("Valor do index %d \n \r", index);
+            
+            ContaIndex ++;
+
+            // Handling ContaIndex based on exec value
+            if(exec >= 7 || ContaIndex >= index){
+                SinalJOGManual = (ContaIndex > index) ? 5 : 1;
+            } else {
+                SinalJOGManual = (ContaIndex > index) ? 5 : 1;
+            }
+
+            if (SinalJOGManual == 1) {
+                lcd.cls();
+                lcd.printf("Selecione a posicao %3d \n", ContaIndex);
+                printf("Selecione next pos \n \r");
+                wait(2);
+            }
+
+            if(SinalJOGManual == 5) {
+                EnableMotorX = 1;
+                EnableMotorY = 1;
+                EnableMotorZ = 1;
+                printf("JogManual finalizado \n \r");
+                break;
+            }
+
+            EnableMotorX = 1;
+            EnableMotorY = 1;
+            EnableMotorZ = 1;
+        }           
+    }
+
+
+
+void JogAutomaticoXY(int AlvoX, int AlvoY) {
+    CounterAutoX = UltimoX;
+    CounterAutoY = UltimoY;
+
+    printf("Contador atual x %d \n \r", CounterAutoX);
+    printf("Contador atual y %d \n \r", CounterAutoY);
+    printf("Target atual x %d \n \r", AlvoX);
+    printf("Target atual y %d \n \r", AlvoY);
+
+    SinalFinalizadoX = 0;
+    SinalFinalizadoY = 0;
+
+    while(!(SinalFinalizadoX && SinalFinalizadoY)) {
+        StepDriver = !StepDriver;
+        wait_ms(tempo);
+
+        if(CounterAutoX > AlvoX){            
+            EnableMotorX = 0;
+            MotorX.definirDirecao(HORARIO);
+            CounterAutoX--;
+        } else if(CounterAutoX < AlvoX){
+            EnableMotorX = 0;
+            MotorX.definirDirecao(ANTIHORARIO);
+            CounterAutoX++;
+        } else {
+            EnableMotorX = 1;
+            UltimoX = CounterAutoX;
+            SinalFinalizadoX = 1;
         }
 
-        EnableMotorX = 1;
-        EnableMotorY = 1;
-        EnableMotorZ = 1;
+        if(CounterAutoY > AlvoY){
+            EnableMotorY = 0;
+            MotorY.definirDirecao(ANTIHORARIO);
+            CounterAutoY--;
+        } else if(CounterAutoY < AlvoY){
+            EnableMotorY = 0;
+            MotorY.definirDirecao(HORARIO);
+            CounterAutoY++;
+        } else {
+            EnableMotorY = 1;
+            UltimoY = CounterAutoY;
+            SinalFinalizadoY = 1;
+        }
     }
-   
+}
+
+
+        
+
+
+      
+
