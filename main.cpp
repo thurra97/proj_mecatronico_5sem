@@ -776,10 +776,10 @@ void JogAutomaticoXY(int AlvoX, int AlvoY) {
     CounterAutoX = UltimoX;
     CounterAutoY = UltimoY;
 
-    printf("Contador atual x %d \n \r", CounterAutoX);
-    printf("Contador atual y %d \n \r", CounterAutoY);
-    printf("Target atual x %d \n \r", AlvoX);
-    printf("Target atual y %d \n \r", AlvoY);
+    printf("CounterX %d \n \r", CounterAutoX);
+    printf("CounterY %d \n \r", CounterAutoY);
+    printf("Alvo atual X %d \n \r", AlvoX);
+    printf("Alvo atual Y %d \n \r", AlvoY);
 
     SinalFinalizadoX = 0;
     SinalFinalizadoY = 0;
@@ -817,6 +817,59 @@ void JogAutomaticoXY(int AlvoX, int AlvoY) {
         }
     }
 }
+
+
+void jog_automatico_y(int ValorAlvo) {
+    CounterAutoY = UltimoY;
+    printf("CounterY %d \n \r", CounterAutoY);
+
+    while(CounterAutoY != ValorAlvo) {
+        StepDriver = !StepDriver;
+        wait_ms(tempo);
+        
+        if(CounterAutoY > ValorAlvo){
+            EnableMotorY = 0;
+            MotorY.definirDirecao(ANTIHORARIO);
+            CounterAutoY--;
+        } else if(CounterAutoY < ValorAlvo){
+            EnableMotorY = 0;
+            MotorY.definirDirecao(HORARIO);
+            CounterAutoY++;
+        }
+    }
+    
+    printf("Posicionado no Alvo Y \n \r");
+    EnableMotorY = 1;
+    UltimoY = CounterAutoY;
+}
+
+void jog_automatico_z(int ValorAlvo) {
+    CounterAutoZ = UltimoZ;
+    EnableMotorX = 1;
+    EnableMotorY = 1;
+
+    printf("CounterZ %d \n \r", CounterAutoZ);
+
+    while(CounterAutoZ != ValorAlvo) {
+        StepDriver = !StepDriver;
+        wait_ms(tempo);
+        
+        if(CounterAutoZ > ValorAlvo){
+            EnableMotorZ = 0;
+            MotorZ.definirDirecao(ANTIHORARIO);
+            CounterAutoZ--;
+        } else if(CounterAutoZ < ValorAlvo){
+            EnableMotorZ = 0;
+            MotorZ.definirDirecao(HORARIO);
+            CounterAutoZ++;
+        }
+    }
+
+    printf("Posicionado no Alvo Z \n \r");
+    EnableMotorZ = 1;
+    UltimoZ = CounterAutoZ;
+}
+
 
 
         
