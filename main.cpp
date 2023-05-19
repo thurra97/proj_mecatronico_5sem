@@ -432,6 +432,7 @@ int calcularMililitrosDespejo() {
  */
 
 void JOGManual(int index){
+
     int ContaIndex = 0;
     int UltimoX = 0;
     int UltimoY = 0;
@@ -578,65 +579,151 @@ void JOGManual(int index){
             }
 
 
-            while(SinalJOGManual == 4){
-            listaPosX[ContaIndex] = PosicaoX;
-            listaPosY[ContaIndex] = PosicaoY;
-            listaPosZ[ContaIndex] = PosicaoZ;
-            UltimoX =  PosicaoX;
-            UltimoY = PosicaoY;
-            UltimoZ = PosicaoZ;
-            printf("Salvo x: %d \n \r", listaPosX[ContaIndex]);
-            printf("Salvo Y: %d \n \r", listaPosX[ContaIndex]);
-            printf("Salvo Z: %d \n \r", listaPosX[ContaIndex]);
-            printf("Valor counter %d \n \r", ContaIndex);
-            printf("Valor indice %d \n \r", index);
-            ContaIndex += 1;
-            if(exec >= 7){
-                if(ContaIndex > index){
-                    SinalJOGManual = 5;
-                    break;
+                while(SinalJOGManual == 4){
+                mililitros = calcularMililitrosDespejo();
+                listaPosX[ContaIndex] = PosicaoX;
+                listaPosY[ContaIndex] = PosicaoY;
+                listaPosZ[ContaIndex] = PosicaoZ;
+                UltimoX =  PosicaoX;
+                UltimoY = PosicaoY;
+                UltimoZ = PosicaoZ;
+                printf("Salvo x: %d \n \r", listaPosX[ContaIndex]);
+                printf("Salvo Y: %d \n \r", listaPosX[ContaIndex]);
+                printf("Salvo Z: %d \n \r", listaPosX[ContaIndex]);
+                printf("Valor counter %d \n \r", ContaIndex);
+                printf("Valor indice %d \n \r", index);
+                ContaIndex += 1;
+                if(exec >= 7){
+                    if(ContaIndex > index){
+                        SinalJOGManual = 5;
+                        break;
+                    } else {
+                        SinalJOGManual = 1;
+                        lcd.cls();
+                        lcd.printf("Agora selecione a posicao %3d \n", ContaIndex);
+                        printf("Selecione a proX pos \n \r");
+                        wait(2);
+                        break;
+                    }
                 } else {
-                    SinalJOGManual = 1;
-                    lcd.cls();
-                    lcd.printf("Agora selecione a posicao %3d \n", ContaIndex);
-                    printf("Selecione a proxima posicao \n \r");
-                    wait(2);
-                    break;
+                    if(ContaIndex >= index){
+                        SinalJOGManual = 5;
+                        break;
+                    } else {
+                        SinalJOGManual = 1;
+                        lcd.cls();
+                        lcd.printf("Agora selecione a posicao %3d \n", ContaIndex);
+                        printf("Selecione a prox pos \n \r");
+                        wait(2);
+                        break;
+                    }
                 }
-            } else {
-                if(ContaIndex >= index){
-                    SinalJOGManual = 5;
-                    break;
-                } else {
-                    SinalJOGManual = 1;
-                    lcd.cls();
-                    lcd.printf("Agora selecione a posicao %3d \n", ContaIndex);
-                    printf("Selecione a proxima posicao \n \r");
-                    wait(2);
-                    break;
-                }
+                
             }
-            
-        }
 
-        if(SinalJOGManual == 5){
+            if(SinalJOGManual == 5){
+                EnableMotorX = 1;
+                EnableMotorY = 1;
+                EnableMotorZ = 1; 
+                printf("JogManual finalizado \n \r");
+                break;
+            }
+
+
             EnableMotorX = 1;
             EnableMotorY = 1;
-            EnableMotorZ = 1; 
-            printf("JogManual finalizado \n \r");
-            break;
+            EnableMotorZ = 1;
+
+        }
+        while(ContaIndex <= index) {        
+        lcd_show(4);
+        CounterX = PosicaoX;
+
+        while(SinalJOGManual == 1){
+            y = JoyStick.read() * 1000;
+            lcd.locate(0, 0);
+            lcd.printf("X de coleta:%4d\n", PosicaoX);
+
+            if(y > 600 && SinalJOGManual == 1 && CounterX < ValorFinalX){
+                StepDriver = !StepDriver;
+                wait_ms(tempo);
+                EnableMotorX = 0;
+                MotorX.definirDirecao(ANTIHORARIO);
+                CounterX++;
+            } else if(y < 300 && SinalJOGManual == 1 && CounterX > ValorInicialX){
+                StepDriver = !StepDriver;
+                wait_ms(tempo);
+                EnableMotorX = 0;
+                MotorX.definirDirecao(HORARIO);
+                CounterX--;
+            } else {
+                EnableMotorX = 1;
+            }
+
+            PosicaoX = CounterX;
         }
 
+        EnableMotorX = 1;
+        EnableMotorY = 1;
+        }
+
+        //EIXO Y
+        CounterY = PosicaoY;
+        while(SinalJOGManual == 2){
+            y = JoyStick.read() * 1000;
+            lcd.locate(0, 1);
+            lcd.printf("Y de coleta:%4d\n", PosicaoY);
+
+            if(y > 600 && SinalJOGManual == 2 && CounterY < ValorFinalY){
+                StepDriver = !StepDriver;
+                wait_ms(tempo);
+                EnableMotorY = 0;
+                MotorY.definirDirecao(HORARIO);
+                CounterX--;
+            } else if(y < 300 && SinalJOGManual == 2 && CounterY > ValorInicialY){
+                StepDriver = !StepDriver;
+                wait_ms(tempo);
+                EnableMotorY = 0;
+                MotorY.definirDirecao(ANTIHORARIO);
+                CounterY++;
+            } else {
+                EnableMotorY = 1;
+            }
+
+            PosicaoY = CounterY;
+        }
+
+        EnableMotorX = 1;
+        EnableMotorY = 1;
+    }
+          //EIXO Z
+        CounterZ = PosicaoZ;
+        while(SinalJOGManual == 3){
+            y = JoyStick.read() * 1000;
+            lcd.locate(0, 2);
+            lcd.printf("Z de coleta:%4d\n", PosicaoZ);
+
+            if(y > 600 && SinalJOGManual == 2 && CounterZ < ValorFinalZ){
+                StepDriver = !StepDriver;
+                wait_ms(tempo);
+                EnableMotorZ = 0;
+                MotorZ.definirDirecao(HORARIO);
+                CounterZ++;
+            } else if(y < 300 && SinalJOGManual == 2 && CounterZ > ValorInicialZ){
+                StepDriver = !StepDriver;
+                wait_ms(tempo);
+                EnableMotorZ = 0;
+                MotorZ.definirDirecao(ANTIHORARIO);
+                CounterY--;
+            } else {
+                EnableMotorZ = 1;
+            }
+
+            PosicaoZ = CounterZ;
+        }
 
         EnableMotorX = 1;
         EnableMotorY = 1;
         EnableMotorZ = 1;
-
     }
-
-    
-}
-
-        
-} 
-
+   
