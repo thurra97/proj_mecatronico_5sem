@@ -1,16 +1,17 @@
 #include "mbed.h"
 #include "Motor.h"
 #include "TextLCD.h"
+#include "mbed2/299/drivers/InterruptIn.h"
 
 
 I2C i2c_lcd(I2C_SDA, I2C_SCL);
-TextLCD_I2C lcd(&i2c_lcd, 0x4e, TextLCD::LCD20x4);
+TextLCD_I2C lcd(&i2c_lcd, 0x27, TextLCD::LCD20x4);
 
 // DECLARANDO BOTOES DE INTERAÇÃO
 InterruptIn botaoZ(D13);
 DigitalIn botaoMENOSML(D11);
 DigitalIn botaoMAISML(PB_13);
-DigitalIn botaoCONFIRMACAO(PB_15);
+InterruptIn botaoCONFIRMACAO(PB_15);
 InterruptIn botaoVOLTAR(PB_14); 
 
 // BOTAO DE EMERGENCIA
@@ -61,18 +62,19 @@ bool Referenciamento = 0;
 int CounterX = 0;
 int CounterY = 0;
 int CounterZ= 0;
+bool prosseguir = false;
 int Counter = 0;
 int ValorInicialX = 0;
-int ValorFinalX = xx;
+int ValorFinalX = 100000;
 int PosicaoX;
 int CounterAutoZ;
 int CounterAutoX;
 int CounterAutoY;
 int ValorInicialZ = 0;
-int ValorFinalZ = xx;
+int ValorFinalZ = 100000;
 int PosicaoZ;
 int ValorInicialY = 0;
-int ValorFinalY = xx;
+int ValorFinalY = 100000;
 int PosicaoY;
 int etapa = 2;
 int Referenciamento_Done = 0;
@@ -714,7 +716,7 @@ void JOGManual(int index){
                 wait_ms(tempo);
                 EnableMotorZ = 0;
                 MotorZ.definirDirecao(ANTIHORARIO);
-                CounterY--;
+                CounterZ--;
             } else {
                 EnableMotorZ = 1;
             }
@@ -731,8 +733,8 @@ void JOGManual(int index){
             listaPosY[ContaIndex] = PosicaoY;
             listaPosZ[ContaIndex] = PosicaoZ;
             UltimoX = PosicaoX;
-            UltimoZ = PosicaoY;
-            UltimoX = PosicaoZ;
+            UltimoY = PosicaoY;
+            UltimoZ = PosicaoZ;
 
             printf("Posicao X: %d \n \r", listaPosX[ContaIndex]);
             printf("Posicao Y: %d \n \r", listaPosY[ContaIndex]);
@@ -870,10 +872,229 @@ void jog_automatico_z(int ValorAlvo) {
     UltimoZ = CounterAutoZ;
 }
 
+void LidaConfirma(){
+    if(debounce.read_ms() > 500){ 
+        exec += 1;   
+        printf("Var exec %d \n \r", exec);
+    }
+    prosseguir = true;
+    wait(2);
+    debounce.reset(); 
+}
 
-
+void LidarVoltar(){
+    if(debounce.read_ms() > 150){
         
+        if(exec == 3 || exec == 4) {
+            SinalReferenciamentoX = 0;
+            SinalReferenciamentoY = 0;
+            SinalReferenciamentoZ = 0;
+            exec = 0;
+        } else if(exec == 7 || exec == 8){
+            exec = 3;
+        } else if (exec > 9){
+            exec = 7;
+        }
+        printf("Valor do exec %d \n \r", exec);
+
+    }
+    debounce.reset();
+}
+
+void LidaEmergencia(){
+    // reset_motors = 0;
+    EnableMotorX = 1;
+    EnableMotorY = 1;
+    EnableMotorZ = 1;
+    NVIC_SystemReset();
+    
+}
+
+int seleciona_pontos_de_solta() {
+    lcd.cls();
+    lcd_show(5);
+
+    while(exec != 7) {
+        y = JoyStick.read() * 1000;
+        lcd.locate(0, 1);
+        lcd.printf("De despejo: %3d\n", NSoltar);
+        
+        while(y < 300 && NSoltar < 9){
+            wait(0.3);
+            y = JoyStick.read() * 1000;
+            NSoltar++;
+            printf("Num soltas: %d \n \r", NSoltar);
+        }
+
+        while(y > 600 && NSoltar > 1){
+            wait(0.3);
+            y = JoyStick.read() * 1000;
+            NSoltar--;
+            printf("Num soltas: %d \n \r", NSoltar);
+        }
+
+        if(NSoltar >= 9) {
+            NSoltar = 9;
+            printf("Num de soltas: %d \n \r", NSoltar);
+        }
+
+        if(NSoltar <= 1) {
+            NSoltar = 1;
+            printf("Num soltas: %d \n \r", NSoltar);
+        }
+    }
+}
 
 
-      
+int main() {
+    
+    debounce.start();
+    FimDeCursoY1.rise(&CheckInicioY);
+    FimDeCursoY2.rise(&CheckFimY);
+    FimDeCursoZ1.rise(&CheckInicioZ);
+    FimDeCursoZ2.rise(&CheckFimZ);
+    FimDeCursoX1.rise(&CheckFimX);
+    FimDeCursoX2.rise(&CheckInicioX);
+ // código para identificar mudança do uso do eixo x pro eixo y
+    botaoZ.rise(&alterarParaEixoZ);
+    botaoCONFIRMACAO.rise(&LidaConfirma);
+    botaoVOLTAR.rise(&LidarVoltar);
+    botaoEMERGENCIA.fall(&LidaEmergencia);
+
+    //reset_motors = 1;
+    EnableMotorX = 1;
+    EnableMotorY = 1;
+    EnableMotorZ = 1;
+    StepDriver = 1;
+    MotorX.definirDirecao(HORARIO);
+    MotorY.definirDirecao(HORARIO);
+    MotorZ.definirDirecao(HORARIO);
+    
+    AcionamentoPipeta = 1;
+
+    lcd.setBacklight(TextLCD::LightOn);
+    lcd.setCursor(TextLCD::CurOff_BlkOn);
+
+    if(botaoEMERGENCIA == 0){
+        lcd_show(3);
+        EnableMotorX = 1;
+        EnableMotorY = 1;
+        EnableMotorZ = 1;
+        StepDriver = 0;
+        while(botaoEMERGENCIA == 0){}
+
+    }
+
+    while(1){
+        EnableMotorX = 1;
+        EnableMotorY = 1;
+        EnableMotorZ = 1;
+        if(exec == 0){
+            lcd_show(0);
+            exec = 1;
+        } 
+        else if(exec == 2){
+            lcd_show(1);
+            ReferenciamentoX(1);
+            ReferenciamentoY(1);
+            ReferenciamentoZ(1);
+            exec = 3;
+        }
+        else if(exec == 3){
+            lcd_show(2);
+            EnableMotorX = 1;
+            EnableMotorY = 1;
+            EnableMotorZ = 1;
+            StepDriver = 0;
+            exec = 4;
+        }
+        else if(exec == 5){
+            JOGManual(1);
+            exec = 6;
+        } 
+        else if(exec == 6){
+            seleciona_pontos_de_solta();
+        }
+        else if(exec == 7){
+            lcd_show(6);
+            exec = 8;
+        }
+        else if(exec == 9){
+            SinalJOGManual = 1;
+            printf("N de posicoes de solta %d \n \r", NSoltar+1);
+            JOGManual(NSoltar);
+            etapa = 9 + NSoltar;
+            exec = etapa;
+        }
+        else if(exec == etapa){
+            EnableMotorX = 1;
+            EnableMotorY = 1;
+            EnableMotorZ = 1;
+            StepDriver = 1;
+            lcd_show(7);
+            prosseguir = 0;
+            exec = etapa + 1;
+        }
+        else if(exec == etapa + 1 && prosseguir == 1){
+            lcd_show(8);
+            jog_automatico_z(ValorInicialZ);
+            exec = etapa + 2;
+        }
+        else if(exec == etapa + 2){
+            exec = 14;
+            lcd_show(9);
+            for(int i = 1; i <= NSoltar; i++){
+                lcd.cls();
+                lcd.locate(0,0);
+                lcd.printf("Ciclo para posicao %d \n", i);
+
+                printf("Ciclo para posicao %d \n \r", i);
+                wait(1);
+                Counter = 0;
+                lcd.locate(0,1);
+                lcd.printf("Iteracao numero %d \n", Counter);
+                
+                if(i >= 0){
+                    mililitros = lista_ml[i];
+                    while(Counter < mililitros){
+                        lcd.locate(0,1);
+                        lcd.printf("Iteracao numero %d \n", Counter);
+                        printf("Iteração numero %d \n \r", Counter);
+                        Jog(ValorInicialZ);
+                        JogAutomaticoXY(listaPosX[0], listaPosY[0]);
+                        jog_automatico_z(listaPosZ[0]);
+                        AcionamentoPipeta = 0;
+                        wait(2);
+                        AcionamentoPipeta = 1;
+                        wait(4);
+                        // wait(5);
+                        jog_automatico_z(ValorInicialZ);
+                        
+                        JogAutomaticoXY(listaPosX[i], listaPosY[i]);
+                        jog_automatico_z(listaPosZ[i]);
+
+                        AcionamentoPipeta = 0;
+                        wait(2);
+                        AcionamentoPipeta = 1;
+                        wait(4);
+                        Counter ++;
+                    }
+                }             
+            }
+            jog_automatico_z(ValorInicialZ);
+            JogAutomaticoXY(ValorInicialX, ValorInicialY);
+            lcd.cls();
+            lcd.printf("Ciclos finalizados");
+            EnableMotorX = 1;
+            EnableMotorY = 1;
+            EnableMotorZ = 1;
+        }
+        else if(exec == 14){
+            exec = etapa;
+        }
+            
+        
+    }
+    
+}
 
