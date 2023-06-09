@@ -7,10 +7,11 @@ I2C i2c(PB_9, PB_8);
 TextLCD_I2C lcd(&i2c, 0x4e, TextLCD::LCD20x4);
 
 // DECLARANDO BOTOES DE INTERAÇÃO
-DigitalIn botaoMENOSML(PA_12);
-DigitalIn botaoMAISML(PC_5);
+InterruptIn botaoMENOSML(PA_12);
+InterruptIn botaoMAISML(PC_5);
 InterruptIn botaoCONFIRMACAO(PC_8);
 InterruptIn botaoVOLTAR(PC_6); 
+InterruptIn botaoUSER(PC_13);
 
 // BOTAO DE EMERGENCIA
 InterruptIn botaoEMERGENCIA(PD_2);
@@ -22,12 +23,12 @@ InterruptIn FimDeCursoY1(PB_10); //FDC(Y) = NF = GND    , QUANDO ABERTO = 3,3V
 InterruptIn FimDeCursoY2(PB_4);
 InterruptIn FimDeCursoZ1(PA_6);
 InterruptIn FimDeCursoZ2(PA_7);
-
+DigitalOut led(LED1);
 
 //DECLARANDO JOYSTICK E BOTAO JOYSTICK
-AnalogIn EixoXJoyStick(PC_2);
+// AnalogIn EixoXJoyStick(PC_2);
 AnalogIn EixoYJoyStick(PC_3);
-InterruptIn botaoZ(PB_6);
+InterruptIn botaoPOS(PB_6);
 
 
 // DECLARANDO MOTORES
@@ -78,15 +79,15 @@ int UltimoX;
 int UltimoY;
 int UltimoZ;
 int tamanho;
-int y;
-int x;
-int z;
+float y;
+float x;
+float z;
 
 //LISTAS DE ARMAZENAMENTO DAS POSICOES DE PEGA/SOLTA E MILILITROS
-int listaPosX[10];
-int listaPosZ[10];
-int listaPosY[10];
-int lista_ml[10];
+int listaPosX[15];
+int listaPosZ[15];
+int listaPosY[15];
+int lista_ml[15];
 
 //VARIAVEIS UTILIZADAS NAS FUNCOES DE MILILITROS/DESEPEJAR/PEGAR
 int NSoltar = 1;
@@ -120,8 +121,8 @@ void lcd_show(int state) {
         lcd.printf("para iniciar o \n");
         lcd.printf("referenciamento");
         break;
-        exec = 1;
-       case 1: 
+        
+        case 1: 
         lcd.cls();
         lcd.printf("Referenciamento \n");
         lcd.printf("Em \n");
@@ -132,20 +133,22 @@ void lcd_show(int state) {
         lcd.cls();
         lcd.printf("Referenciamento \n");
         lcd.printf("concluido \n");
-        lcd.printf("Deseja selecionar a posicao de pega ? \n");
+        lcd.printf("Deseja selecionar a posicao de pega? \n");
         break;
 
         case 3:
         lcd.cls();
-        lcd.printf("Botao de emergencia!! beep  \n");
+        lcd.printf("Botao de emergencia  \n");
+        lcd.printf("Travamento   \n");
+        lcd.printf("Automatico   \n");
         break;
 
         case 4:
         lcd.cls();
-        lcd.printf("X de pegar:%4d\n", PosicaoX);
-        lcd.printf("Y de pegar:%4d\n", PosicaoY);
-        lcd.printf("Z de pegar:%4d\n", PosicaoZ);
-        lcd.printf("Pressione 'CNFRM'");
+        lcd.printf("eixo X:%4d\n", PosicaoX);
+        lcd.printf("eixo Z:%4d\n", PosicaoZ);
+        lcd.printf("eixo Y:%4d\n", PosicaoY);
+        // lcd.printf("Pressione 'CNFRM'");
         break;
 
         case 5:
@@ -153,15 +156,16 @@ void lcd_show(int state) {
         lcd.printf("Qtd de pontos\n");
         lcd.printf("De despejo: %3d\n", NSoltar);
         lcd.printf("Pressione 'CNFRM' \n");
-        lcd.printf("Para confirmar");
+
+ 
         break;
 
         case 6:
         lcd.cls();
-        lcd.printf("Aperte 'CNFRM' para \n");
-        lcd.printf("iniciar a selecao\n");
-        lcd.printf("das posicoes de \n");
-        lcd.printf("SOLTA \n");
+        lcd.printf("Aperte 'CNFRM' p \n");
+        lcd.printf("iniciar selecao\n");
+        lcd.printf("das pos de \n");
+        lcd.printf("PEGA \n");
         break;
 
         case 7:
@@ -187,6 +191,14 @@ void lcd_show(int state) {
         lcd.cls();
         lcd.printf("Qts ml para a\n");
         lcd.printf("posicao: %3d\n", mililitros);
+        break;
+        
+        case 11:
+        lcd.cls();
+        lcd.printf("Aperte 'CNFRM' p \n");
+        lcd.printf("iniciar selecao\n");
+        lcd.printf("das pos de \n");
+        lcd.printf("SOLTA \n");
         break;
 
     }
@@ -254,7 +266,7 @@ void ReferenciamentoX(int MotorAcionado){
         Counter +=1; // Incrementa o contador
         if(SinalReferenciamentoX == 0){ // Se o sinal de referenciamento estiver desligado
             StepDriverXY =! StepDriverXY; // Inverte o estado do driver de passo
-            wait_ms(tempo); // Espera tempo
+            wait_us(1500); // Espera tempo
             EnableMotorX = 0; // Habilita o motor
             MotorX.definirDirecao(HORARIO); // Define a direção do motor para o sentido horário
 
@@ -391,142 +403,147 @@ int calcularMililitrosDespejo() {
     return mililitros;  // Retorna a quantidade de mililitros
 }
 
-// FUNCAO RESONSAVEL POR ALTERAR O EIXO CONTROLADO PELO JOYSTICK PARA O EIXO Z ATRAVES DA FLAG UTILIZADA PARA SE ATIVAR O Z 
-void alterarParaEixoZ_XY() {
-    SinalJOGManual_Z = !SinalJOGManual_Z; //INVERTE O SINAL DA FLAG
-}
+// // FUNCAO RESONSAVEL POR ALTERAR O EIXO CONTROLADO PELO JOYSTICK PARA O EIXO Z ATRAVES DA FLAG UTILIZADA PARA SE ATIVAR O Z 
+// void alterarParaEixoZ_XY() {
+//     SinalJOGManual_Z = !SinalJOGManual_Z; //INVERTE O SINAL DA FLAG
+// }
 
 
 
-// Função para mostrar informações no LCD.
-void lcd_showJOGMANUAL(int opt){
-    switch(opt){
-        case 1: // Mostra o contador X.
-            lcd.cls();
-            lcd.printf("Posicao X: %3d\n", CounterX);
-            lcd.printf("Posicao Y: %3d\n", CounterY);
-            lcd.printf("Posicao Z: %3d\n", CounterZ);
-            break;
-        case 2: // Mostra o contador Y.
-            lcd.cls();
-            lcd.printf("Posicao X: %3d\n", CounterX);
-            lcd.printf("Posicao Y: %3d\n", CounterY);
-            lcd.printf("Posicao Z: %3d\n", CounterZ);
-            break;
-        case 3: // Mostra o contador Z.
-            lcd.cls();
-            lcd.printf("Posicao X: %3d\n", CounterX);
-            lcd.printf("Posicao Y: %3d\n", CounterY);
-            lcd.printf("Posicao Z: %3d\n", CounterZ);
-            break;
-        case 4: // Limpa o LCD.
-            lcd.cls();
-            break;
-    }
-}
+// // Função para mostrar informações no LCD.
+// void lcd_showJOGMANUAL(int opt){
+//     switch(opt){
+//         case 1: // Mostra o contador X.
+//             lcd.cls();
+//             lcd.printf("Posicao X: %3d\n", CounterX);
+//             lcd.printf("Posicao Y: %3d\n", CounterY);
+//             lcd.printf("Posicao Z: %3d\n", CounterZ);
+//             break;
+//         case 2: // Mostra o contador Y.
+//             lcd.cls();
+//             lcd.printf("Posicao X: %3d\n", CounterX);
+//             lcd.printf("Posicao Y: %3d\n", CounterY);
+//             lcd.printf("Posicao Z: %3d\n", CounterZ);
+//             break;
+//         case 3: // Mostra o contador Z.
+//             lcd.cls();
+//             lcd.printf("Posicao X: %3d\n", CounterX);
+//             lcd.printf("Posicao Y: %3d\n", CounterY);
+//             lcd.printf("Posicao Z: %3d\n", CounterZ);
+//             break;
+//         case 4: // Limpa o LCD.
+//             lcd.cls();
+//             break;
+//     }
+// }
 
 
-// Função auxiliar para mover o motor e simplificar a funcao do JOGManual
-void moverMotor(int &Counter, int ValorFinal, int ValorInicial, DigitalOut &EnableMotor, Motor &MotorObj, AnalogIn &EixoJoyStick, DigitalOut &StepDriver, Direcao direcao, const int tempo) {
-    // Lê o valor do joystick
-    int valorJoystick = EixoJoyStick.read() * 1000;
+// // Função auxiliar para mover o motor e simplificar a funcao do JOGManual
+// void moverMotor(int &Counter, int ValorFinal, int ValorInicial, DigitalOut &EnableMotor, Motor &MotorObj, AnalogIn &EixoJoyStick, DigitalOut &StepDriver, Direcao direcao, const int tempo) {
+//     // Lê o valor do joystick
+//     int valorJoystick = EixoJoyStick.read() * 1000;
 
-    // Move o motor na direção escolhida
-    while(direcao == ANTIHORARIO && valorJoystick > 700) {
-        valorJoystick = EixoJoyStick.read() * 1000;
-        if(Counter >= ValorFinal) {
-            EnableMotor = 1;
-            Counter = ValorFinal;
-        } else {
-            StepDriver = !StepDriver;
-            wait_ms(tempo);
-            EnableMotor = 0;
-            MotorObj.definirDirecao(ANTIHORARIO);
-            Counter -=1;
-        }
-    }
+//     // Move o motor na direção escolhida
+//     while(direcao == ANTIHORARIO && valorJoystick > 700) {
+//         valorJoystick = EixoJoyStick.read() * 1000;
+//         if(Counter >= ValorFinal) {
+//             EnableMotor = 1;
+//             Counter = ValorFinal;
+//         } else {
+//             StepDriver = !StepDriver;
+//             wait_ms(tempo);
+//             EnableMotor = 0;
+//             MotorObj.definirDirecao(ANTIHORARIO);
+//             Counter -=1;
+//         }
+//     }
 
-    while(direcao == HORARIO && valorJoystick < 300) {
-        valorJoystick = EixoJoyStick.read() * 1000;
-        if(Counter <= ValorInicial) {
-            EnableMotor = 1;
-            Counter = ValorInicial;
-        } else {
-            StepDriver = !StepDriver;
-            wait_ms(tempo);
-            EnableMotor = 0;
-            MotorObj.definirDirecao(HORARIO);
-            Counter +=1;
-        }
-    }
-}
-
-void JOGManual(int index){
-
-    int ContaIndex = 0;
-    int CounterX = 0;
-    int CounterY = 0;
-    int CounterZ = 0;
-
-    // Se a variável "exec" for maior ou igual a 7, inicia a coleta de posição.
-    if(exec >= 7){
-        ContaIndex = 1;
-        lcd.cls();
-        lcd.printf("Selecione a \n");
-        lcd.printf("posicao[XYZ] %3d \n", ContaIndex);
-        wait(3);
-    }
-
-    if(exec >= 7){
-        while(ContaIndex <= index){
-            lcd_showJOGMANUAL(4);
-            
-            CounterX = PosicaoX;
-
-            // Coleta a posição do eixo X enquanto o sinal JOGManual_Z for falso.
-            while(SinalJOGManual_Z == false){
-                moverMotor(CounterX, ValorFinalX, ValorInicialX, EnableMotorX, MotorX, EixoXJoyStick, StepDriverXY, ANTIHORARIO, tempo);
-                PosicaoX = CounterX;
-                EnableMotorX = 1;
-                EnableMotorY = 1;
-            } 
-
-            // Coleta a posição do eixo Y enquanto o sinal JOGManual_Z for falso.
-            CounterY = PosicaoY;
-            while(SinalJOGManual_Z == false){
-                moverMotor(CounterY, ValorFinalY, ValorInicialY, EnableMotorY, MotorY, EixoYJoyStick, StepDriverXY, HORARIO, tempo);
-                PosicaoY = CounterY;
-                EnableMotorX = 1;
-                EnableMotorY = 1;
-            }
-
-            // Coleta a posição do eixo Z enquanto o sinal JOGManual_Z for verdadeiro.
-            CounterZ = PosicaoZ;
-            while(SinalJOGManual_Z == true){
-                moverMotor(CounterZ, ValorFinalZ, ValorInicialZ, EnableMotorZ, MotorZ, EixoYJoyStick, StepDriverZ, HORARIO, tempo);
-                PosicaoZ = CounterZ;
-                EnableMotorX = 1;
-                EnableMotorY = 1;
-                EnableMotorZ = 1;
-            }
-            
-            // Incrementa ContaIndex para a próxima posição a ser coletada.
-            ContaIndex++;
-            lcd_showJOGMANUAL(4);
-            lcd.printf("Selecione a \n");
-            lcd.printf("posicao[XYZ] %3d \n", ContaIndex);
-            wait(3);
-        }
-
-        // Quando todas as posições forem coletadas, exibe a mensagem e retorna.
-        lcd_showJOGMANUAL(4);
-        lcd.printf("Fim de selecao\n");
-        wait(3);
-        return;
-    }
-}
+//     while(direcao == HORARIO && valorJoystick < 300) {
+//         valorJoystick = EixoJoyStick.read() * 1000;
+//         if(Counter <= ValorInicial) {
+//             EnableMotor = 1;
+//             Counter = ValorInicial;
+//         } else {
+//             StepDriver = !StepDriver;
+//             wait_ms(tempo);
+//             EnableMotor = 0;
+//             MotorObj.definirDirecao(HORARIO);
+//             Counter +=1;
+//         }
+//     }
+// }
 
 // void JOGManual(int index){
+
+//     // int ContaIndex = 0;
+//     // int CounterX = 0;
+//     // int CounterY = 0;
+//     // int CounterZ = 0;
+
+//     // Se a variável "exec" for maior ou igual a 7, inicia a coleta de posição.
+//     if(exec >= 7){
+//         ContaIndex = 1;
+//         lcd.cls();
+//         lcd.printf("Selecione a \n");
+//         lcd.printf("posicao[XYZ] %3d \n", ContaIndex);
+//         wait(3);
+//     }
+
+//     if(exec >= 7){
+//         while(ContaIndex <= index){
+//             lcd_showJOGMANUAL(1);
+            
+//             CounterX = PosicaoX;
+
+//             // Coleta a posição do eixo X enquanto o sinal JOGManual_Z for falso.
+//             while(SinalJOGManual_Z == false){
+//                 moverMotor(CounterX, ValorFinalX, ValorInicialX, EnableMotorX, MotorX, EixoXJoyStick, StepDriverXY, ANTIHORARIO, tempo);
+//                 PosicaoX = CounterX;
+//                 EnableMotorX = 0;
+//                 EnableMotorY = 1;
+//                 printf("%d", CounterX);
+//             } 
+
+//             // Coleta a posição do eixo Y enquanto o sinal JOGManual_Z for falso.
+//             CounterY = PosicaoY;
+//             while(SinalJOGManual_Z == false){
+//                 moverMotor(CounterY, ValorFinalY, ValorInicialY, EnableMotorY, MotorY, EixoYJoyStick, StepDriverXY, HORARIO, tempo);
+//                 PosicaoY = CounterY;
+//                 EnableMotorX = 1;
+//                 EnableMotorY = 0;
+//                 printf("%d", CounterY);
+
+//             }
+
+//             // Coleta a posição do eixo Z enquanto o sinal JOGManual_Z for verdadeiro.
+//             CounterZ = PosicaoZ;
+//             while(SinalJOGManual_Z == true){
+//                 moverMotor(CounterZ, ValorFinalZ, ValorInicialZ, EnableMotorZ, MotorZ, EixoYJoyStick, StepDriverZ, HORARIO, tempo);
+//                 PosicaoZ = CounterZ;
+//                 EnableMotorX = 1;
+//                 EnableMotorY = 1;
+//                 EnableMotorZ = 0;
+//                 printf("%d", CounterZ);
+
+//             }
+            
+//             // Incrementa ContaIndex para a próxima posição a ser coletada.
+//             ContaIndex++;
+//             lcd_showJOGMANUAL(2);
+//             // lcd.printf("Selecione a \n");
+//             // lcd.printf("posicao[XYZ] %3d \n", ContaIndex);
+//             wait(3);
+//         }
+
+//         // Quando todas as posições forem coletadas, exibe a mensagem e retorna.
+//         lcd_showJOGMANUAL(4);
+//         lcd.printf("Fim de selecao\n");
+//         wait(3);
+//         return;
+//     }
+// }
+
+// // void JOGManual(int index){
 
 //     int ContaIndex = 0;
 //     int CounterX = 0;
@@ -543,15 +560,15 @@ void JOGManual(int index){
 
 //     if(exec >= 7){
 //         while(ContaIndex <= index){
-//             lcd_show(4);
+//             // lcd_show(4);
             
 //             CounterX = PosicaoX;
 //             while(SinalJOGManual_Z == false){
-//                 int x = EixoXJoyStick.read() * 1000;
+//                 float x = EixoXJoyStick.read() * 1000;
 //                 lcd.locate(0, 0);
 //                 lcd.printf("X coletagem: %4d \n", PosicaoX);
-//                 while(x > 700 &&SinalJOGManual_Z == false){
-//                     x = EixoXJoyStick.read() * 1000;
+//                 while(x > 700 && SinalJOGManual_Z == false){
+//                     float x = EixoXJoyStick.read() * 1000;
 //                     if(CounterX >= ValorFinalX){
 //                         EnableMotorX = 1;
 //                         CounterX = ValorFinalX;
@@ -564,7 +581,7 @@ void JOGManual(int index){
 //                     }              
 //                 }
 //                 while(x < 300 && SinalJOGManual_Z == false){
-//                     x = EixoXJoyStick.read() * 1000;
+//                     float x = EixoXJoyStick.read() * 1000;
 //                     if(CounterX <= ValorInicialX){
 //                         EnableMotorX = 1;
 //                         CounterX = ValorInicialX;
@@ -584,11 +601,11 @@ void JOGManual(int index){
 
 //             CounterY = PosicaoY;
 //             while(SinalJOGManual_Z == false){
-//                 int y = EixoYJoyStick.read() * 1000;
+//                 float y = EixoYJoyStick.read() * 1000;
 //                 lcd.locate(0, 1);
 //                 lcd.printf("Y coletagem: %4d \n", PosicaoY);
 //                 while(y > 700 && SinalJOGManual_Z == false){
-//                     y = EixoYJoyStick.read() * 1000;
+//                     float y = EixoYJoyStick.read() * 1000;
 //                     if(CounterY >= ValorFinalY){
 //                         EnableMotorY = 1;
 //                         CounterY = ValorFinalY;
@@ -601,7 +618,7 @@ void JOGManual(int index){
 //                     }              
 //                 }
 //                 while(y < 300 && SinalJOGManual_Z == false){
-//                     y = EixoYJoyStick.read() * 1000;
+//                     float y = EixoYJoyStick.read() * 1000;
 //                     if(CounterY <= ValorInicialY){
 //                         EnableMotorY = 1;
 //                         CounterY = ValorInicialY;
@@ -620,11 +637,11 @@ void JOGManual(int index){
 
 //             CounterZ = PosicaoZ;
 //             while(SinalJOGManual_Z == true){
-//                 int z = EixoYJoyStick.read() * 1000;
+//                 float z = EixoYJoyStick.read() * 1000;
 //                 lcd.locate(0, 2);
 //                 lcd.printf("Z coletagem: %4d \n", PosicaoZ);
 //                 while(z > 700 && SinalJOGManual_Z == true){
-//                     z = EixoYJoyStick.read() * 1000;
+//                     float z = EixoYJoyStick.read() * 1000;
 //                     if(CounterZ >= ValorFinalZ){
 //                         EnableMotorZ = 1;
 //                         CounterZ = ValorFinalZ;
@@ -637,7 +654,7 @@ void JOGManual(int index){
 //                     }              
 //                 }
 //                 while(z < 300 && SinalJOGManual_Z == true){
-//                     z = EixoYJoyStick.read() * 1000;
+//                     float z = EixoXJoyStick.read() * 1000;
 //                     if(CounterZ <= ValorInicialZ){
 //                         EnableMotorZ = 1;
 //                         CounterZ = ValorInicialZ;
@@ -828,7 +845,6 @@ void JOGManual(int index){
 //             if (SinalJOGManual == 1) {
 //                 lcd.cls();
 //                 lcd.printf("Selecione a posicao %3d \n", ContaIndex);
-//                 printf("Selecione next pos \n \r");
 //                 wait(2);
 //             }
 
@@ -845,6 +861,253 @@ void JOGManual(int index){
 //             EnableMotorZ = 1;
 //         }           
 //     }
+
+
+
+// void JOGManualX(int index){
+//     PosicaoX = 0;
+//     CounterX = PosicaoX;
+//     int ContaIndex = 1;
+//     lcd.printf("Selecione a pos %i \n \r", ContaIndex);
+//     lcd.printf("do eixo X \n \r");
+//     x = EixoXJoyStick.read() * 1000;
+//     lcd.locate(0, 3);
+//     lcd.printf("X de coleta: %4d\n", CounterX);
+
+//     while(x > 600 && FimDeCursoX1 == 1 && FimDeCursoX2 == 1){
+//         StepDriverXY = !StepDriverXY;
+//         wait_ms(tempo);
+//         EnableMotorX = 0;
+//         MotorX.definirDirecao(HORARIO);
+//         CounterX+=1;
+//     } 
+//     while(x < 300 && FimDeCursoX1 == 1 && FimDeCursoX2 == 1){
+//         StepDriverXY = !StepDriverXY;
+//         wait_ms(tempo);
+//         EnableMotorX = 0;
+//         MotorX.definirDirecao(ANTIHORARIO);
+//         CounterX-=1;
+//     }
+// }
+
+
+void JOGManual(int index){
+    ContaIndex = 0;
+    UltimoX = 0;
+    UltimoY = 0;
+    CounterX = 0;
+    CounterY = 0;
+    CounterZ = 0;
+
+    if(exec >= 7){
+        ContaIndex = 1;
+        lcd.cls();
+        lcd.printf("Agora selecione a \n");
+        lcd.printf("posicao %3d \n", ContaIndex);
+        wait(2);
+    }
+
+    if(exec >= 7){
+        while(ContaIndex <= index){
+        
+        lcd_show(4);
+        
+        // EIXO X
+        CounterX = PosicaoX;
+        while(SinalJOGManual == 1){
+            // lcd.locate(10, 2);
+            // lcd.printf("X:  %d\n", SinalJOGManual);
+            x = EixoYJoyStick.read() * 1000;
+            lcd.locate(0, 0);
+            lcd.printf("eixo X: %4d\n", PosicaoX);
+            while(x > 600 && SinalJOGManual == 1){
+                x = EixoYJoyStick.read() * 1000;
+                if(FimDeCursoX2 == 0){
+                    EnableMotorX = 1;
+                    // printf("Posicao X = %4d \n \r", CounterX);
+                    continue;
+                } else {
+                    StepDriverXY = !StepDriverXY;
+                    wait_ms(tempo);
+                    EnableMotorX = 0;
+                    MotorX.definirDirecao(ANTIHORARIO);
+                    CounterX += 1;
+                    // printf("Posicao X = %4d \n \r", CounterX); 
+                }
+                
+            }
+            while(x < 300 && SinalJOGManual == 1){
+                x = EixoYJoyStick.read() * 1000;
+                 if(FimDeCursoX1 == 0){
+                    EnableMotorX = 1;
+                    continue;
+                } else {
+                    StepDriverXY = !StepDriverXY;
+                    wait_ms(tempo);
+                    EnableMotorX = 0;
+                    MotorX.definirDirecao(HORARIO);
+                    CounterX -= 1;
+                    // printf("Posicao X = %4d \n \r", CounterX);
+                }
+            }
+            PosicaoX = CounterX;
+            EnableMotorX = 1;
+            EnableMotorY = 1;
+        }
+
+        // EIXO Y
+        CounterY = PosicaoY;
+        while(SinalJOGManual == 2){
+            // lcd.locate(10, 2);
+            // lcd.printf("Y: %d\n", SinalJOGManual);
+            y = EixoYJoyStick.read() * 1000;
+            lcd.locate(0, 1);
+            lcd.printf("eixo Y: %4d\n", PosicaoY);
+            
+            while(y > 600 && SinalJOGManual == 2){
+                y = EixoYJoyStick.read() * 1000;
+                 if(FimDeCursoY2 == 0){
+                    EnableMotorY = 1;
+                    continue;
+                } else {
+                    StepDriverXY = !StepDriverXY;
+                    wait_ms(tempo);
+                    EnableMotorY = 0;
+                    MotorY.definirDirecao(ANTIHORARIO);
+                    CounterY += 1;
+                    // printf("Posicao Y = %4d \n \r", CounterY); 
+                }
+                
+            }
+            while(y <  300 && SinalJOGManual == 2){
+                y = EixoYJoyStick.read() * 1000;
+                if(FimDeCursoY1 == 0){
+                    EnableMotorY = 1;
+                    continue;
+                } else {
+                    StepDriverXY = !StepDriverXY;
+                    wait_ms(tempo);
+                    EnableMotorY = 0;
+                    MotorY.definirDirecao(HORARIO);
+                    CounterY -= 1;
+                    // printf("Posicao Y = %4d \n \r", contador);
+                }
+            }
+
+            PosicaoY = CounterY;
+            EnableMotorX = 1;
+            EnableMotorY = 1;
+        }
+
+        CounterZ = PosicaoZ;
+        while(SinalJOGManual == 3){
+            // lcd.locate(10, 2);
+            // lcd.printf("Z: %d\n", SinalJOGManual);
+            y = EixoYJoyStick.read() * 1000;
+            
+            lcd.locate(0, 2);
+            lcd.printf("eixo Z: %4d\n", PosicaoZ);
+            
+            while(y > 600 && SinalJOGManual == 3){
+                y = EixoYJoyStick.read() * 1000;
+                if(FimDeCursoZ1 == 0){
+                    EnableMotorZ = 1;
+                    continue;
+                } else {
+
+                    StepDriverZ = !StepDriverZ;
+                    wait_ms(tempo);
+                    EnableMotorZ = 0;
+                    MotorZ.definirDirecao(HORARIO);
+                    CounterZ += 1;
+                    // printf("Posicao Y = %4d \n \r", CounterY); 
+                }
+                
+            }
+            while(y < 300 && SinalJOGManual == 3){
+                y = EixoYJoyStick.read() * 1000;
+                 if(FimDeCursoZ2 == 0){
+                    EnableMotorZ = 1;
+                    continue;
+                 }else {
+                    StepDriverZ = !StepDriverZ;
+                    wait_ms(tempo);
+                    EnableMotorZ = 0;
+                    MotorZ.definirDirecao(ANTIHORARIO);
+                    CounterZ -= 1;
+                    // printf("Posicao Y = %4d \n \r", contador);
+                }
+                
+            }
+
+            PosicaoZ = CounterZ;
+            EnableMotorX = 1;
+            EnableMotorY = 1;
+            EnableMotorZ = 1;
+        }
+
+        while(SinalJOGManual == 4){
+            mililitros = calcularMililitrosDespejo();
+            listaPosX[ContaIndex] = PosicaoX;
+            listaPosY[ContaIndex] = PosicaoY;
+            listaPosZ[ContaIndex] = PosicaoZ;
+            lista_ml[ContaIndex] = mililitros;
+            UltimoX = PosicaoX;
+            UltimoY = PosicaoY;
+            UltimoZ = PosicaoZ;
+            // printf("Posicao salva x: %d \n \r", listaPosX[ContaIndex]);
+            // printf("Posicao salva y: %d \n \r", listaPosY[ContaIndex]);
+            // printf("Posicao salva z: %d \n \r", listaPosZ[ContaIndex]);
+            // printf("Mls salvo: %d \n \r", lista_ml[ContaIndex]);
+            // printf("Valor do contador %d \n \r", ContaIndex);
+            // printf("Valor do index %d \n \r", index);
+            ContaIndex += 1;
+            if(exec >= 7){
+                if(ContaIndex > index){
+                    SinalJOGManual = 5;
+                    break;
+                } else {
+                    SinalJOGManual = 1;
+                    lcd.cls();
+                    lcd.printf("Agora selecione a\n" );
+                    lcd.printf("posicao %3d \n", ContaIndex);
+                    printf("Selecione a proxima posicao \n \r");
+                    wait(2);
+                    break;
+                }
+            } else {
+                if(ContaIndex >= index){
+                    SinalJOGManual = 5;
+                    break;
+                } else {
+                    SinalJOGManual = 1;
+                    lcd.cls();
+                    lcd.printf("Agora selecione a posicao %3d \n", ContaIndex);
+                    // printf("Selecione a proxima posicao \n \r");
+                    wait(2);
+                    break;
+                 }
+            }
+            
+        }
+
+        if(SinalJOGManual == 5){
+            EnableMotorX = 1;
+            EnableMotorY = 1;
+            EnableMotorZ = 1; 
+            printf("JOGManual finalizado \n \r");
+            break;
+        }
+
+
+        EnableMotorX = 1;
+        EnableMotorY = 1;
+        EnableMotorZ = 1;
+
+        }
+    }
+}
+
 
 
 // JOG AUTOMATICO DOS EIXOS X E Y
@@ -958,6 +1221,23 @@ void LidaConfirma() {
     debounce.reset(); // Reseta o tempo de debounce
 }
 
+// FUNCAO DO BOTAO DE CONFIRMACAO
+void LidaPosicao() {
+    if(debounce.read_ms() > 200) { // Se a leitura do tempo de debounce for superior a 100ms
+        if(SinalJOGManual == 3) {
+            SinalJOGManual = 1;
+        } else {
+            SinalJOGManual += 1;
+
+        }
+           
+    }
+    debounce.reset(); // Reseta o tempo de debounce
+    // lcd.locate(10, 2);
+    // lcd.printf("SINAL: %d\n", SinalJOGManual);
+}
+
+
 //FUNCAO DO BOTAO MENU
 void LidarVoltar() {
     if(debounce.read_ms() > 100){ // Se a leitura do tempo de debounce for superior a 100ms
@@ -968,6 +1248,16 @@ void LidarVoltar() {
     }
     debounce.reset(); // Reseta o tempo de debounce
 }
+
+void LidaOk(){
+        led = 1;
+    if(debounce.read_ms() > 100){
+
+        SinalJOGManual = 4;
+        }
+        debounce.reset();
+    }
+    
 
 
 // Função de tratamento para botão de emergência
@@ -981,65 +1271,47 @@ void LidaEmergencia(){
     NVIC_SystemReset();
 }
 
-// Função para selecionar pontos de soltura
 int SelecaoPontosSoltar() {
-    // Limpa a tela do display LCD
+    int y;
+    bool isRunning = true;
+
     lcd.cls();
     lcd_show(5);
-
-    // Mantém em loop até a variável "exec" se tornar igual a 7
-    while(exec != 7) {
-        // Leitura do joystick eixo Y
+    
+    while(isRunning) {
         y = EixoYJoyStick.read() * 1000;
-
-        // Posiciona o cursor na linha 1 do LCD
-        lcd.locate(0, 1);
         
-        // Imprime na tela do LCD o número de pontos de soltura
+        if(botaoMAISML.read() == 0 && NSoltar > 1) { // Add a check here
+            wait(0.3);
+            NSoltar -= 1;
+        }
+        else if(botaoMENOSML.read() == 0 ) {
+            wait(0.3);
+            NSoltar += 1;
+        }
+        
+        lcd.locate(0, 1);
+        printf("Numero de soltas: %d \n \r", NSoltar);
         lcd.printf("De despejo: %3d\n", NSoltar);
         
-        // Se o valor de Y for menor que 300 e NSoltar menor que 9
-        while(y < 300 && NSoltar < 9){
-            wait(0.3);
-            y = EixoYJoyStick.read() * 1000;
-            // Incrementa o contador de pontos de soltura
-            NSoltar+=1;
-            printf("Num soltas: %d \n \r", NSoltar);
-        }
-
-        // Se o valor de Y for maior que 600 e NSoltar maior que 1
-        while(y > 600 && NSoltar > 1){
-            wait(0.3);
-            y = EixoYJoyStick.read() * 1000;
-            // Decrementa o contador de pontos de soltura
-            NSoltar-=1;
-            printf("Num soltas: %d \n \r", NSoltar);
-        }
-
-        // Se NSoltar for maior ou igual a 9, define NSoltar como 9
-        if(NSoltar >= 9) {
-            NSoltar = 9;
-            printf("Num de soltas: %d \n \r", NSoltar);
-        }
-
-        // Se NSoltar for menor ou igual a 1, define NSoltar como 1
-        if(NSoltar <= 1) {
-            NSoltar = 1;
-            printf("Num soltas: %d \n \r", NSoltar);
+        if(exec == 7){
+            isRunning = false;
         }
     }
-
-    // Retorna o número de pontos de soltura
+    
+    //returning current number of releases
     return NSoltar;
 }
 
 
 
+
+
+
 int main() {
-    
+    wait(1);
     // Inicia o temporizador debounce
     debounce.start();
-    
     // Liga a luz de fundo do LCD e configura interrupções
     lcd.setBacklight(TextLCD::LightOn);
     FimDeCursoY1.fall(&CheckInicioY);
@@ -1048,10 +1320,13 @@ int main() {
     FimDeCursoZ2.fall(&CheckFimZ);
     FimDeCursoX1.fall(&CheckInicioX);
     FimDeCursoX2.fall(&CheckFimX);
-    botaoZ.fall(&alterarParaEixoZ_XY);
+    botaoMENOSML.fall(&LidaPosicao);
+
+
     botaoCONFIRMACAO.fall(&LidaConfirma);
-    botaoVOLTAR.fall(&LidarVoltar);
+    botaoMAISML.fall(&LidaOk);
     botaoEMERGENCIA.fall(&LidaEmergencia);
+
 
     // Desativa todos os motores e define direções iniciais
     EnableMotorX = 1;
@@ -1063,7 +1338,7 @@ int main() {
     MotorX.definirDirecao(HORARIO);
     MotorY.definirDirecao(ANTIHORARIO);
     MotorZ.definirDirecao(HORARIO);
-    
+
     AcionamentoPipeta = 1;
 
     // Verifica se o botão de emergência está pressionado no início da execução
@@ -1090,6 +1365,8 @@ int main() {
         if(exec == 0){
             lcd_show(0);
             exec = 1;
+            // lcd.locate(19, 3);
+            // lcd.printf("%i", exec);
         } 
         // exec = 2: Referenciamento dos eixos
         else if(exec == 2){
@@ -1098,6 +1375,8 @@ int main() {
             ReferenciamentoX(1);
             ReferenciamentoY(1);
             exec = 3;
+            // lcd.locate(19, 3);
+            // lcd.printf("%i", exec);
         }
         // exec = 3: Preparação para o movimento manual
         else if(exec == 3){
@@ -1109,29 +1388,39 @@ int main() {
             StepDriverZ = 0;
 
             exec = 4;
+            // lcd.locate(19, 3);
+            // lcd.printf("%i", exec);
         }
         // exec = 5: Movimento manual
         else if(exec == 5){
             JOGManual(1);
             exec = 6;
+            // lcd.locate(19, 3);
+            // lcd.printf("%i", exec);
         } 
         // exec = 6: Seleção dos pontos de soltura
         else if(exec == 6){
             SelecaoPontosSoltar();
+            // lcd.locate(19, 3);
+            // lcd.printf("%i", exec);
         }
         // exec = 7: Preparação para a soltura
         else if(exec == 7){
             lcd_show(6);
             exec = 8;
+            // lcd.locate(19, 3);
+            // lcd.printf("%i", exec);
         }
         // exec = 9: Movimento manual até o ponto de soltura
         else if(exec == 9){
             SinalJOGManual = 1;
             JOGManual(NSoltar);
-            etapa_real = 9 + NSoltar;
+            etapa_real = 14 + NSoltar;
             exec = etapa_real;
+            // lcd.locate(19, 3);
+            // lcd.printf("%i", exec);
         }
-        // exec = etapa_real: Preparação para o ciclo de soltura
+        //// exec = etapa_real: Preparação para o ciclo de soltura
         else if(exec == etapa_real){
             EnableMotorX = 1;
             EnableMotorY = 1;
@@ -1142,12 +1431,16 @@ int main() {
             lcd_show(7);
             prosseguir = 0;
             exec = etapa + 1;
+            // lcd.locate(19, 3);
+            // lcd.printf("%i", exec);
         }
         // exec = etapa + 1: Movimento automático para o ponto de soltura
         else if(exec == etapa_real + 1 && prosseguir == true){
             lcd_show(8);
             JogAutomaticoZ(ValorInicialZ);
             exec = etapa_real + 2;
+            // lcd.locate(19, 3);
+            // lcd.printf("%i", exec);
         }
         // exec = etapa_real + 2: Ciclo de soltura
         else if(exec == etapa_real + 2){
@@ -1195,7 +1488,7 @@ int main() {
             EnableMotorY = 1;
             EnableMotorZ = 1;
         }
-        // exec = 14: Retorna para a etapa real
+        //exec = 14: Retorna para a etapa real
         else if(exec == 14){
             exec = etapa_real;
         }
